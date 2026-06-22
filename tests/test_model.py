@@ -76,6 +76,42 @@ def test_multinomial_recovery():
     assert np.all(rel_err < 0.05), f"recovered {res.l_k}, true {l_true}, rel_err {rel_err}"
 
 
+def test_analytic_jacobian_matches_finite_difference():
+    """The analytic Jacobian of the alpha residuals must match finite diffs."""
+    from clastattrition.inversion import _resid_jac, _prepare
+    cells = _synthetic_cells(n_sites=20, n_liths=3, seed=5)
+    l_true = np.array([8_000.0, 25_000.0, 60_000.0])
+    f_obs = predicted_fractions(l_true, cells)
+    counts = np.full(cells.n_sites, 100.0)
+    f_obs, counts, mask = _prepare(f_obs, counts, cells)
+
+    a = np.array([1 / 12_000.0, 1 / 30_000.0, 1 / 80_000.0])
+    r0, J = _resid_jac(a, f_obs, counts, cells, mask)
+    Jfd = np.zeros_like(J)
+    for m in range(len(a)):
+        da = a[m] * 1e-6 + 1e-12
+        ap = a.copy(); ap[m] += da
+        rp, _ = _resid_jac(ap, f_obs, counts, cells, mask)
+        Jfd[:, m] = (rp - r0) / da
+    assert np.allclose(J, Jfd, rtol=1e-4, atol=1e-9), np.abs(J - Jfd).max()
+
+
+def test_alpha_inversion_recovers_truth():
+    from clastattrition.inversion import invert_alpha, invert_alpha_coorddescent
+    cells = _synthetic_cells(n_sites=60, n_liths=3, seed=7)
+    l_true = np.array([8_000.0, 25_000.0, 60_000.0])
+    f_obs = predicted_fractions(l_true, cells)
+    counts = np.full(cells.n_sites, 100.0)
+    res = invert_alpha(f_obs, cells, counts_total=counts)
+    assert res.success
+    rel = np.abs(res.l_k - l_true) / l_true
+    assert np.all(rel < 0.05), (res.l_k, l_true)
+    # coordinate descent should agree (compare in alpha; the most durable
+    # parameter is only marginally constrained, so allow a small atol).
+    alpha_cd, _, _ = invert_alpha_coorddescent(f_obs, cells, counts_total=counts)
+    assert np.allclose(alpha_cd, res.alpha, rtol=0.05, atol=2e-6), (alpha_cd, res.alpha)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
