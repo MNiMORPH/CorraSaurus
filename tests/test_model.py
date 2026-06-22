@@ -76,6 +76,18 @@ def test_multinomial_recovery():
     assert np.all(rel_err < 0.05), f"recovered {res.l_k}, true {l_true}, rel_err {rel_err}"
 
 
+def test_reduce_cells_is_lossless():
+    """Histogram reduction must reproduce fractions to ~machine precision."""
+    from clastattrition.model import reduce_cells
+    cells = _synthetic_cells(n_sites=15, n_liths=4, seed=11)
+    red = reduce_cells(cells, bin_width_m=12.0)
+    assert red.n_cells < cells.n_cells
+    for l in ([5e3, 15e3, 40e3, 80e3], [2e3, 200e3, 1e3, 50e3]):
+        f_full = predicted_fractions(np.array(l), cells)
+        f_red = predicted_fractions(np.array(l), red)
+        assert np.allclose(f_full, f_red, atol=1e-6), np.abs(f_full - f_red).max()
+
+
 def test_analytic_jacobian_matches_finite_difference():
     """The analytic Jacobian of the alpha residuals must match finite diffs."""
     from clastattrition.inversion import _resid_jac, _prepare
