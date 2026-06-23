@@ -97,25 +97,38 @@ def test_phi_lab_recovers_scaling():
     assert np.isclose(r.phi, phi_true, rtol=1e-3), (r.phi, phi_true)
 
 
-def test_abrasion_only_recovers_lengths():
-    """abrasion x {mass,size}: recover known per-lithology attrition lengths.
+def test_lab_prior_reduces_to_phi_lab():
+    """As lab_logsigma -> 0 the lognormal-prior mode collapses to point phi_lab."""
+    cells = _synthetic_cells(n_sites=70, seed=20)
+    nl = cells.n_liths
+    lab = np.array([0.006, 0.36, 0.002, 0.006, 0.018])
+    D0 = np.full(nl, 40.0)
+    obs = _generate(cells, 4.0 * lab, np.zeros(nl), np.ones(nl), D0, channels=("mass", "size"))
+    kw = dict(abrasion=True, fragmentation=False, production=False, lab_pattern=lab, **obs)
+    rp = AT.ClastInversion(cells, abrasion_mode="phi_lab", **kw).fit()
+    rt = AT.ClastInversion(cells, abrasion_mode="lab_prior",
+                           lab_logsigma=np.full(nl, 1e-3), **kw).fit()
+    assert np.isclose(rt.phi, rp.phi, rtol=1e-2), (rt.phi, rp.phi)
+    assert np.allclose(rt.a_perkm, rp.a_perkm, rtol=1e-2)
 
-    (This is the configuration that replaced the former invert_joint, whose
-    equivalence was verified during consolidation before it was removed.)"""
-    cells = _synthetic_cells(n_sites=70, seed=4)
-    l_true = np.array([400.0, 0.83, 14.3, 5.9, 1.3])     # km
-    a = 1.0 / l_true
+
+def test_lab_prior_recovers_rates():
+    """With a loose prior the data dominates and the well-resolved lithologies
+    recover known a_k = phi*lab*exp(delta).  Durable (tiny-a) lithologies are
+    only weakly constrained by mass+size -- the real physics, not a bug -- so the
+    recovery assertion is on the resolvable subset."""
+    cells = _synthetic_cells(n_sites=90, seed=21)
+    nl = cells.n_liths
+    lab = np.array([0.006, 0.36, 0.002, 0.006, 0.018])
     D0 = np.array([45., 35., 46., 36., 28.])
-    obs = _generate(cells, a, np.zeros(cells.n_liths), np.ones(cells.n_liths), D0,
-                    channels=("mass", "size"))
-    r = AT.ClastInversion(cells, mass_obs=obs["mass_obs"], size_obs=obs["size_obs"],
-                          size_count=obs["size_count"], counts_total=np.full(cells.n_sites, 100.0),
-                          abrasion=True, fragmentation=False, production=False,
-                          a_bounds=(1e3 / 400e3, 200.0)).fit()
-    # the resolvable (non-durable) lengths recover well
-    resolvable = l_true < 100
-    assert np.allclose(r.l_abrasion_km[resolvable], l_true[resolvable], rtol=1e-2), \
-        (r.l_abrasion_km, l_true)
+    a = 5.0 * lab * np.exp(np.array([0.3, -0.4, 0.2, -0.5, 0.1]))
+    obs = _generate(cells, a, np.zeros(nl), np.ones(nl), D0, channels=("mass", "size"))
+    r = AT.ClastInversion(cells, abrasion_mode="lab_prior", lab_pattern=lab,
+                          lab_logsigma=np.full(nl, 10.0),     # loose => data dominates
+                          abrasion=True, fragmentation=False, production=False, **obs).fit()
+    assert r.success
+    resolvable = a > 0.05
+    assert np.allclose(r.a_perkm[resolvable], a[resolvable], rtol=0.03), (r.a_perkm, a)
 
 
 # --- modularity ------------------------------------------------------------
@@ -206,6 +219,9 @@ def test_input_validation():
     assert _raises_value_error(lambda: AT.ClastInversion(cells, size_obs=z))           # size needs count
     assert _raises_value_error(lambda: AT.ClastInversion(cells, mass_obs=z, abrasion_mode="bad"))
     assert _raises_value_error(lambda: AT.ClastInversion(cells, mass_obs=z, abrasion_mode="phi_lab"))  # no pattern
+    lab = np.ones(cells.n_liths)
+    assert _raises_value_error(  # lab_prior needs lab_logsigma
+        lambda: AT.ClastInversion(cells, mass_obs=z, abrasion_mode="lab_prior", lab_pattern=lab))
 
 
 def test_fragmentation_inflates_count_not_mass():
