@@ -189,6 +189,61 @@ def test_predict_and_residuals_match_fit():
     assert np.allclose(inv.residuals(r), r.raw.fun)
 
 
+def _raises_value_error(fn):
+    try:
+        fn()
+        return False
+    except ValueError:
+        return True
+
+
+def test_input_validation():
+    """The constructor rejects incoherent configurations."""
+    cells = _synthetic_cells(seed=10)
+    z = np.zeros((cells.n_sites, cells.n_liths))
+    assert _raises_value_error(lambda: AT.ClastInversion(cells))                       # no channel
+    assert _raises_value_error(lambda: AT.ClastInversion(cells, size_obs=z))           # size needs count
+    assert _raises_value_error(lambda: AT.ClastInversion(cells, mass_obs=z, abrasion_mode="bad"))
+    assert _raises_value_error(lambda: AT.ClastInversion(cells, mass_obs=z, abrasion_mode="phi_lab"))  # no pattern
+
+
+def test_fragmentation_inflates_count_not_mass():
+    """The fingerprint that lets count separate g: fragmentation raises a
+    lithology's count share but leaves its mass share untouched."""
+    # one site, two lithologies with identical source geometry; fragment only lith 0.
+    d = np.linspace(500.0, 14_000.0, 40)
+    cells = SourceCells(
+        site_idx=np.zeros(2 * len(d)),
+        lith_idx=np.r_[np.zeros(len(d)), np.ones(len(d))],
+        distance=np.r_[d, d], weight=np.ones(2 * len(d)),
+        n_sites=1, n_liths=2,
+    )
+    inv = AT.ClastInversion(cells, mass_obs=np.zeros((1, 2)), count_obs=np.zeros((1, 2)),
+                            abrasion=False, fragmentation=True, production=False)
+    pred = inv._forward(np.zeros(2), np.array([0.3, 0.0]), np.zeros(2), np.log(np.full(2, 40.0)))
+    assert np.allclose(pred["mass"][0], 0.5)        # mass share unchanged: still 50/50
+    assert pred["count"][0, 0] > 0.5                 # fragmenting lithology over-counted
+
+
+def test_uncertainty_responds_to_noise():
+    """Sigma is ~0 for a noise-free exact fit and grows once noise is added."""
+    cells = _synthetic_cells(n_sites=80, seed=12)
+    nl = cells.n_liths
+    obs = _generate(cells, np.full(nl, 0.05), np.zeros(nl), np.ones(nl),
+                    np.full(nl, 40.0), channels=("mass", "size"))
+    kw = dict(abrasion=True, fragmentation=False, production=False)
+    r0 = AT.ClastInversion(cells, **kw, **obs).fit()
+    rng = np.random.default_rng(0)
+    noisy = dict(obs)
+    m = obs["mass_obs"] + rng.normal(0, 0.02, obs["mass_obs"].shape)
+    noisy["mass_obs"] = np.clip(m, 1e-6, None)
+    noisy["mass_obs"] /= noisy["mass_obs"].sum(1, keepdims=True)
+    rN = AT.ClastInversion(cells, **kw, **noisy).fit()
+    assert r0.a_std.max() < 1e-3
+    assert rN.a_std.max() > r0.a_std.max()
+    assert np.all(np.isfinite(rN.a_std)) and np.all(rN.a_std >= 0)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
