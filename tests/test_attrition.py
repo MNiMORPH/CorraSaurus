@@ -222,6 +222,34 @@ def test_predict_and_residuals_match_fit():
     assert np.allclose(inv.residuals(r), r.raw.fun)
 
 
+def test_poisson_deviance_residual():
+    """Deviance residual: 0 when n==mu; -sqrt(2*mu) for a zero count."""
+    from clastattrition.attrition import _poisson_dev_resid
+    r = _poisson_dev_resid(np.array([5.0, 0.0, 0.0, 3.0]), np.array([5.0, 2.0, 4.5, 3.0]))
+    assert np.isclose(r[0], 0.0)
+    assert np.isclose(r[1], -2.0)        # -sqrt(2*2)
+    assert np.isclose(r[2], -3.0)        # -sqrt(2*4.5)
+    assert np.isclose(r[3], 0.0)
+
+
+def test_count_likelihood_modes_recover():
+    """Both the exact multinomial and lsq count likelihoods recover known rates."""
+    cells = _synthetic_cells(n_sites=80, seed=30)
+    nl = cells.n_liths
+    a = np.array([0.005, 0.30, 0.002, 0.010, 0.05])
+    g = np.array([0.02, 0.10, 0.005, 0.30, 0.08])
+    c = np.array([1.0, 0.5, 1.0, 3.0, 0.4])
+    D0 = np.array([45., 35., 46., 36., 28.])
+    obs = _generate(cells, a, g, c, D0)
+    assert _raises_value_error(lambda: AT.ClastInversion(cells, count_likelihood="bad", **obs))
+    for lik in ("multinomial", "lsq"):
+        r = AT.ClastInversion(cells, abrasion=True, fragmentation=True, production=True,
+                              count_likelihood=lik, **obs).fit()
+        assert r.success
+        assert np.allclose(r.a_perkm, a, atol=1e-3) and np.allclose(r.g_perkm, g, atol=1e-3), \
+            (lik, r.a_perkm, r.g_perkm)
+
+
 def _raises_value_error(fn):
     try:
         fn()
