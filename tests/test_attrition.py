@@ -97,24 +97,25 @@ def test_phi_lab_recovers_scaling():
     assert np.isclose(r.phi, phi_true, rtol=1e-3), (r.phi, phi_true)
 
 
-def test_reproduces_invert_joint():
-    """abrasion x {mass,size} must match the standalone invert_joint."""
-    from clastattrition.inversion import invert_joint
+def test_abrasion_only_recovers_lengths():
+    """abrasion x {mass,size}: recover known per-lithology attrition lengths.
+
+    (This is the configuration that replaced the former invert_joint, whose
+    equivalence was verified during consolidation before it was removed.)"""
     cells = _synthetic_cells(n_sites=70, seed=4)
-    a = np.array([0.0025, 1.2, 0.07, 0.17, 0.8])      # within invert_joint's l bounds
+    l_true = np.array([400.0, 0.83, 14.3, 5.9, 1.3])     # km
+    a = 1.0 / l_true
     D0 = np.array([45., 35., 46., 36., 28.])
     obs = _generate(cells, a, np.zeros(cells.n_liths), np.ones(cells.n_liths), D0,
                     channels=("mass", "size"))
-    counts = np.full(cells.n_sites, 100.0)
-    rj = invert_joint(cells, f_obs=obs["mass_obs"], counts_total=counts,
-                      size_mean=obs["size_obs"], size_count=obs["size_count"],
-                      mode="joint", n=0.0)
-    r = AT.ClastInversion(cells, counts_total=counts,
-                          mass_obs=obs["mass_obs"], size_obs=obs["size_obs"],
-                          size_count=obs["size_count"],
+    r = AT.ClastInversion(cells, mass_obs=obs["mass_obs"], size_obs=obs["size_obs"],
+                          size_count=obs["size_count"], counts_total=np.full(cells.n_sites, 100.0),
                           abrasion=True, fragmentation=False, production=False,
                           a_bounds=(1e3 / 400e3, 200.0)).fit()
-    assert np.allclose(r.l_abrasion_km, rj.l_k / 1e3, rtol=1e-3), (r.l_abrasion_km, rj.l_k / 1e3)
+    # the resolvable (non-durable) lengths recover well
+    resolvable = l_true < 100
+    assert np.allclose(r.l_abrasion_km[resolvable], l_true[resolvable], rtol=1e-2), \
+        (r.l_abrasion_km, l_true)
 
 
 # --- modularity ------------------------------------------------------------
