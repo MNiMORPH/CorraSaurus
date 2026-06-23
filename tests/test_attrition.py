@@ -250,6 +250,26 @@ def test_count_likelihood_modes_recover():
             (lik, r.a_perkm, r.g_perkm)
 
 
+def test_area_shape_scales_predicted_count():
+    """area_shape (k_A=a/b) multiplies a lithology's predicted area amplitude."""
+    cells = _synthetic_cells(seed=3)
+    nl = cells.n_liths
+    shp = (cells.n_sites, nl)
+    a = np.full(nl, 0.05); g = np.zeros(nl); c = np.ones(nl); D0 = np.full(nl, 40.0)
+    kw = dict(count_obs=np.zeros(shp), size_obs=np.full(shp, np.nan),
+              size_count=np.ones(shp), abrasion=True, production=True)
+    base = AT.ClastInversion(cells, **kw)
+    f = np.ones(nl); f[2] = 2.0                      # treat lithology 2 as platy
+    shaped = AT.ClastInversion(cells, area_shape=f, **kw)
+    pb = base._forward(a, g, np.log(c), np.log(D0))["count"]
+    ps = shaped._forward(a, g, np.log(c), np.log(D0))["count"]
+    # normalization cancels in a ratio, so lith 2 / lith 0 scales by exactly k_A
+    rb = pb[:, 2] / pb[:, 0]; rs = ps[:, 2] / ps[:, 0]
+    good = np.isfinite(rb) & np.isfinite(rs) & (rb > 0)
+    assert good.any()
+    assert np.allclose(rs[good], 2.0 * rb[good])
+
+
 def _raises_value_error(fn):
     try:
         fn()
