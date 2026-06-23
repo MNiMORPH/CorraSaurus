@@ -112,6 +112,25 @@ def test_lab_prior_reduces_to_phi_lab():
     assert np.allclose(rt.a_perkm, rp.a_perkm, rtol=1e-2)
 
 
+def test_lab_prior_fit_phi_false():
+    """fit_phi=False drops the global scaling: a_k = lab_k * exp(delta_k), no phi."""
+    cells = _synthetic_cells(n_sites=80, seed=22)
+    nl = cells.n_liths
+    lab = np.array([0.006, 0.36, 0.002, 0.006, 0.018])
+    D0 = np.full(nl, 40.0)
+    a = lab * np.exp(np.array([0.2, -0.3, 0.1, -0.2, 0.15]))
+    obs = _generate(cells, a, np.zeros(nl), np.ones(nl), D0, channels=("mass", "size"))
+    inv = AT.ClastInversion(cells, abrasion_mode="lab_prior", lab_pattern=lab,
+                            lab_logsigma=np.full(nl, 5.0), fit_phi=False,
+                            abrasion=True, fragmentation=False, production=False, **obs)
+    assert "phi" not in inv._slices                 # no global-phi parameter block
+    r = inv.fit()
+    assert r.success
+    # with a loose prior the data dominates; the resolvable lithology recovers
+    # (a tighter prior biases it toward lab_pattern -- expected for a penalty term)
+    assert np.isclose(r.a_perkm[1], a[1], rtol=0.05), (r.a_perkm[1], a[1])
+
+
 def test_lab_prior_recovers_rates():
     """With a loose prior the data dominates and the well-resolved lithologies
     recover known a_k = phi*lab*exp(delta).  Durable (tiny-a) lithologies are
