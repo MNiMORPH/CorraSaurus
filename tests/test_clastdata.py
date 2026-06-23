@@ -74,6 +74,33 @@ def test_mass_is_sumD_not_sumD3(tmp_path):
     assert not np.isclose(sumD, sumD3)  # they really differ
 
 
+def test_shape_factor_scales_mass_and_number_not_area(tmp_path):
+    xlsx = tmp_path / "counts.xlsx"
+    _make_workbook(str(xlsx))
+    code_map = {"G": 2, "M": 4}  # treat granite as platy, quartzite equant
+    g, m = POSITION["granite"], POSITION["quartzite"]
+
+    base = build_observations(str(xlsx), code_map)
+    shaped = build_observations(str(xlsx), code_map,
+                                shape_factors={"granite": {"c_b": 0.25, "b_a": 0.5}})
+
+    # area fraction is shape-robust -> unchanged
+    for nm in (NAMES[g], NAMES[m]):
+        assert shaped.loc["S1", f"area_frac_{nm}"] == pytest.approx(
+            base.loc["S1", f"area_frac_{nm}"])
+
+    # mass: granite raw weight ΣD=20 scaled by 0.25 -> 5; quartzite 40 unchanged
+    assert shaped.loc["S1", f"mass_frac_{NAMES[g]}"] == pytest.approx(5 / (5 + 40))
+    assert shaped.loc["S1", f"mass_frac_{NAMES[m]}"] == pytest.approx(40 / (5 + 40))
+
+    # number: granite Σ1/D²=0.02 scaled by 0.5 -> 0.01; quartzite 1/1600 unchanged
+    wg, wm = 0.5 * (2 / 100.0), 1 / 1600.0
+    assert shaped.loc["S1", f"number_frac_{NAMES[g]}"] == pytest.approx(wg / (wg + wm))
+
+    with pytest.raises(ValueError):
+        build_observations(str(xlsx), code_map, shape_factors={"basalt": {"c_b": 0.5}})
+
+
 def test_fractions_matrix_kinds_and_alias():
     cols = {}
     for kind in ("number", "area", "mass"):
