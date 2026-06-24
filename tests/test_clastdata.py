@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from clastattrition.clastdata import build_observations, fractions_matrix
-from clastattrition.lithology import NAMES, POSITION
+from clastattrition.lithology import NAMES, POSITION, TORO
 
 openpyxl = pytest.importorskip("openpyxl")
 
@@ -37,7 +37,7 @@ def test_horvitz_thompson_fractions(tmp_path):
     _make_workbook(str(xlsx))
     code_map = {"G": 2, "M": 4}  # granite, quartzite
 
-    df = build_observations(str(xlsx), code_map)
+    df = build_observations(str(xlsx), code_map, TORO)
     assert list(df.index) == ["S1"]
     g, m = POSITION["granite"], POSITION["quartzite"]
 
@@ -66,7 +66,7 @@ def test_mass_is_sumD_not_sumD3(tmp_path):
     """Mass fraction must use Sum D (D^3 * 1/D^2), not the biased Sum D^3."""
     xlsx = tmp_path / "counts.xlsx"
     _make_workbook(str(xlsx))
-    df = build_observations(str(xlsx), {"G": 2, "M": 4})
+    df = build_observations(str(xlsx), {"G": 2, "M": 4}, TORO)
     g = POSITION["granite"]
     sumD = 20 / 60                      # correct Horvitz-Thompson mass fraction
     sumD3 = (2 * 10 ** 3) / (2 * 10 ** 3 + 40 ** 3)  # the old, biased value
@@ -80,8 +80,8 @@ def test_shape_factor_scales_mass_and_number_not_area(tmp_path):
     code_map = {"G": 2, "M": 4}  # treat granite as platy, quartzite equant
     g, m = POSITION["granite"], POSITION["quartzite"]
 
-    base = build_observations(str(xlsx), code_map)
-    shaped = build_observations(str(xlsx), code_map,
+    base = build_observations(str(xlsx), code_map, TORO)
+    shaped = build_observations(str(xlsx), code_map, TORO,
                                 shape_factors={"granite": {"c_b": 0.25, "b_a": 0.5}})
 
     # area fraction is shape-robust -> unchanged
@@ -98,7 +98,7 @@ def test_shape_factor_scales_mass_and_number_not_area(tmp_path):
     assert shaped.loc["S1", f"number_frac_{NAMES[g]}"] == pytest.approx(wg / (wg + wm))
 
     with pytest.raises(ValueError):
-        build_observations(str(xlsx), code_map, shape_factors={"basalt": {"c_b": 0.5}})
+        build_observations(str(xlsx), code_map, TORO, shape_factors={"basalt": {"c_b": 0.5}})
 
 
 def test_fractions_matrix_kinds_and_alias():
@@ -108,10 +108,10 @@ def test_fractions_matrix_kinds_and_alias():
             cols[f"{kind}_frac_{nm}"] = [0.2]
     df = pd.DataFrame(cols, index=["S1"])
 
-    area = fractions_matrix(df, "area")
+    area = fractions_matrix(df, TORO, "area")
     assert area.shape == (1, len(NAMES))
     # legacy "count" aliases to "area"
-    np.testing.assert_array_equal(fractions_matrix(df, "count"), area)
+    np.testing.assert_array_equal(fractions_matrix(df, TORO, "count"), area)
 
     with pytest.raises(ValueError):
-        fractions_matrix(df, "volume")
+        fractions_matrix(df, TORO, "volume")
