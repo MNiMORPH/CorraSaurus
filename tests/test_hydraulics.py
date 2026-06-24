@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from clastattrition.hydraulics import (
+from corrasaurus.hydraulics import (
     critical_shear_stress, transport_shear_stress, site_d50_mm, site_transport_shear)
 
 

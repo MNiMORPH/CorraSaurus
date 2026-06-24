@@ -4,8 +4,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from clastattrition.clastdata import build_observations, fractions_matrix
-from clastattrition.lithology import NAMES, POSITION, TORO
+from corrasaurus.clastdata import build_observations, fractions_matrix
+from corrasaurus.categories import Categories
+
+# A self-contained Categories for the method test (no Toro dependency).
+_CATS = Categories(names=("granite", "cretaceous", "quartzite", "schist", "volcanics"),
+                   indices=(2, 3, 4, 5, 6))
+NAMES = _CATS.names
+POSITION = _CATS.position_by_name
+TORO = _CATS
 
 openpyxl = pytest.importorskip("openpyxl")
 

@@ -1,4 +1,4 @@
-"""Tests for the modular process x channel inversion (clastattrition.attrition).
+"""Tests for the modular process x channel inversion (corrasaurus.attrition).
 
 All synthetic and self-contained (no external data), matching test_model.py.
 
@@ -10,8 +10,8 @@ import pickle
 
 import numpy as np
 
-from clastattrition.model import SourceCells
-from clastattrition import attrition as AT
+from corrasaurus.model import SourceCells
+from corrasaurus import attrition as AT
 
 
 def _synthetic_cells(n_sites=60, n_liths=5, seed=0):
@@ -224,7 +224,7 @@ def test_predict_and_residuals_match_fit():
 
 def test_poisson_deviance_residual():
     """Deviance residual: 0 when n==mu; -sqrt(2*mu) for a zero count."""
-    from clastattrition.attrition import _poisson_dev_resid
+    from corrasaurus.attrition import _poisson_dev_resid
     r = _poisson_dev_resid(np.array([5.0, 0.0, 0.0, 3.0]), np.array([5.0, 2.0, 4.5, 3.0]))
     assert np.isclose(r[0], 0.0)
     assert np.isclose(r[1], -2.0)        # -sqrt(2*2)

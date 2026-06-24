@@ -2,7 +2,7 @@
 
 import pytest
 
-from clastattrition.categories import Categories
+from corrasaurus.categories import Categories
 
 
 def test_basic_mappings_and_order():

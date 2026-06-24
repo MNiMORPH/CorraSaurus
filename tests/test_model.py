@@ -5,8 +5,8 @@ Run with:  python -m pytest tests/    (or just execute this file)
 
 import numpy as np
 
-from clastattrition.model import SourceCells, predicted_counts, predicted_fractions
-from clastattrition.inversion import invert
+from corrasaurus.model import SourceCells, predicted_counts, predicted_fractions
+from corrasaurus.inversion import invert
 
 
 def _synthetic_cells(n_sites=40, n_liths=3, seed=0):
@@ -78,7 +78,7 @@ def test_multinomial_recovery():
 
 def test_reduce_cells_is_lossless():
     """Histogram reduction must reproduce fractions to ~machine precision."""
-    from clastattrition.model import reduce_cells
+    from corrasaurus.model import reduce_cells
     cells = _synthetic_cells(n_sites=15, n_liths=4, seed=11)
     red = reduce_cells(cells, bin_width_m=12.0)
     assert red.n_cells < cells.n_cells
@@ -90,7 +90,7 @@ def test_reduce_cells_is_lossless():
 
 def test_analytic_jacobian_matches_finite_difference():
     """The analytic Jacobian of the alpha residuals must match finite diffs."""
-    from clastattrition.inversion import _resid_jac, _prepare
+    from corrasaurus.inversion import _resid_jac, _prepare
     cells = _synthetic_cells(n_sites=20, n_liths=3, seed=5)
     l_true = np.array([8_000.0, 25_000.0, 60_000.0])
     f_obs = predicted_fractions(l_true, cells)
@@ -109,7 +109,7 @@ def test_analytic_jacobian_matches_finite_difference():
 
 
 def test_alpha_inversion_recovers_truth():
-    from clastattrition.inversion import invert_alpha, invert_alpha_coorddescent
+    from corrasaurus.inversion import invert_alpha, invert_alpha_coorddescent
     cells = _synthetic_cells(n_sites=60, n_liths=3, seed=7)
     l_true = np.array([8_000.0, 25_000.0, 60_000.0])
     f_obs = predicted_fractions(l_true, cells)
