@@ -1,4 +1,7 @@
-# CorraSaurus
+# :sauropod: :rock: CorraSaurus
+
+*Corrasion der Steine*: gravel-clast breakdown following Sternberg's Law,
+applicable to mixing from varied source areas in natural catchments.
 
 Joint inversion for **per-class Sternberg attrition (e-folding) distances** from
 downstream clast fining. Given, for many sample sites, the upstream distribution
