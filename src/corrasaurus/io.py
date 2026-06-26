@@ -40,6 +40,16 @@ def load_source_cells(path: str, site_order, categories) -> SourceCells:
 
     Rows whose ``site`` is not in ``site_order`` (e.g. unmatched names) or whose
     ``lith_index`` is not a modelled source class are dropped with no error.
+
+    The four-column schema is the same whether each row is one source raster
+    cell or a pre-binned ``(site, lith, distance-bin)`` histogram (the latter is
+    what Provenisaurus now emits by default): a histogram row just carries a
+    summed ``weight`` and the bin's weight-mean ``distance_m``.  Granularity is
+    transparent here because the forward model only ever reads ``weight`` and
+    ``distance``, never a cell count, so both inputs flow through this one path
+    unchanged.  :func:`~.model.reduce_cells` remains available either way --
+    idempotent on already-binned input, and the standard coarsener for raw
+    per-cell tables from any other source.
     """
     pbi = categories.position_by_index
     df = pd.read_csv(path)
